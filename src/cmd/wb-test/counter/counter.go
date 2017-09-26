@@ -38,17 +38,27 @@ func NewCounter(in io.Reader, out io.Writer, substr string) *Counter {
 	return &Counter{In: in,
 		Out: out,
 		Substring: substr,
-		result: make(chan string, MaxNumWorkers),
-		buffer: new(bytes.Buffer),
-		doneWrite: make(chan struct{}),
-		doneWork: make(chan struct{})}
+		WorkersNum: MaxNumWorkers}
 }
 
 func (c *Counter) SetMaxNumWorkers(num int32) {
 	c.WorkersNum = num
 }
 
+func (c *Counter) init() {
+	if c.WorkersNum == 0 {
+		c.WorkersNum = MaxNumWorkers
+	}
+	c.result = make(chan string, c.WorkersNum)
+	c.buffer = new(bytes.Buffer)
+	c.doneWork = make(chan struct{})
+	c.doneWrite = make(chan struct{})
+	return
+}
+
 func (c *Counter) Count() error {
+	c.init()
+
 	go c.writeWorkerRun()
 
 	scanner := bufio.NewScanner(c.In)
@@ -108,7 +118,6 @@ func (c *Counter) taskWorkerRun(url string) {
 
 		}
 	}()
-
 	if response, err := http.Get(url); err == nil {
 
 		defer response.Body.Close()
@@ -119,18 +128,21 @@ func (c *Counter) taskWorkerRun(url string) {
 			c.result <- "Count for " + url + ": " + strconv.Itoa(cnt) + "\n"
 			return
 		} else {
-			c.result <- `Error In url '` + url + `'` + "error: " + err.Error() + "\n"
+			c.result <- `Error in url '` + url + `'` + "error: " + err.Error() + "\n"
 			return
 		}
 	} else {
-		c.result <- `Error In url '` + url + `'` + " error: " + err.Error() + "\n"
+		c.result <- `Error in url '` + url + `'` + " error: " + err.Error() + "\n"
 		return
 	}
 
 }
 
 func Count() {
-	c := Counter{In: os.Stdin, Out: os.Stdout, Substring: "Go", WorkersNum: MaxNumWorkers}
+	c := Counter{In: os.Stdin,
+		Out: os.Stdout,
+		Substring: "Go",
+	}
 	c.Count()
 	return
 }
