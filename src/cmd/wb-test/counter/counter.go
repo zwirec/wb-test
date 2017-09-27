@@ -69,6 +69,7 @@ func (c *Counter) Count() error {
 			<-c.doneWork
 		}
 		c.wg.Add(1)
+		atomic.AddInt32(&c.wCurr, 1)
 		go c.taskWorkerRun(scanner.Text())
 	}
 	c.wg.Wait()
@@ -105,11 +106,8 @@ func (c *Counter) writeWorkerRun() {
 }
 
 func (c *Counter) taskWorkerRun(url string) {
-	atomic.AddInt32(&c.wCurr, 1)
-
 	defer func() {
 		c.wg.Done()
-		atomic.AddInt32(&c.wCurr, -1)
 		select {
 		case c.doneWork <- struct{}{}:
 			{
@@ -117,6 +115,7 @@ func (c *Counter) taskWorkerRun(url string) {
 		default:
 
 		}
+		atomic.AddInt32(&c.wCurr, -1)
 	}()
 	if response, err := http.Get(url); err == nil {
 
