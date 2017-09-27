@@ -65,7 +65,7 @@ func (c *Counter) Count() error {
 	writer := bufio.NewWriter(c.Out)
 
 	for scanner.Scan() {
-		if c.WorkersNum == c.wCurr {
+		if c.WorkersNum == atomic.LoadInt32(&c.wCurr) {
 			<-c.doneWork
 		}
 		c.wg.Add(1)
